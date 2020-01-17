@@ -1,6 +1,6 @@
 import hashlib
 import requests
-
+from threading import Thread
 import sys
 
 from uuid import uuid4
@@ -23,14 +23,29 @@ def proof_of_work(last_proof):
     start = timer()
 
     print("Searching for next proof")
-    proof = 0
-    #  TODO: Your code here
+
+    proof1 = random.randint(1000, 1000000)
+    proof2 = proof1 + 1
+    found = False
+    while found == False:
+        if timer() - start > 5:
+            print('retrying')
+            return
+        if valid_proof(last_proof, proof1):
+            proof = proof1
+            found = True
+        if valid_proof(last_proof, proof2):
+            proof = proof2
+            found = True
+        proof1 += 2
+        proof2 += 2
+            
 
     print("Proof found: " + str(proof) + " in " + str(timer() - start))
     return proof
 
 
-def valid_proof(last_hash, proof):
+def valid_proof(last_proof, proof):
     """
     Validates the Proof:  Multi-ouroborus:  Do the last six characters of
     the hash of the last proof match the first six characters of the hash
@@ -38,9 +53,12 @@ def valid_proof(last_hash, proof):
 
     IE:  last_hash: ...AE9123456, new hash 123456E88...
     """
-
-    # TODO: Your code here!
-    pass
+    last_proof_hash = hashlib.sha256(f'{last_proof}'.encode()).hexdigest()
+    proof_hash = hashlib.sha256(f'{proof}'.encode()).hexdigest()
+    if last_proof_hash != proof_hash:
+        return proof_hash[-6:] == last_proof_hash[-6:]
+    else:
+        return False
 
 
 if __name__ == '__main__':
@@ -66,6 +84,10 @@ if __name__ == '__main__':
         # Get the last proof from the server
         r = requests.get(url=node + "/last_proof")
         data = r.json()
+        # Chech for new block
+        current = data.get('proof')
+        while current == requests.get(url=node + "/last_proof"):
+            continue
         new_proof = proof_of_work(data.get('proof'))
 
         post_data = {"proof": new_proof,
